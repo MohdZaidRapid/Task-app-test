@@ -1,28 +1,9 @@
 const request = require("supertest");
-const jwt = require("jsonwebtoken");
 const app = require("../src/app");
 const User = require("../src/models/user");
-const mongoose = require("mongoose");
+const { userOneId, userOne, setupDatabase } = require("./fixtures/db");
 
-const userOneId = new mongoose.Types.ObjectId();
-
-const userOne = {
-  _id: userOneId,
-  name: "Mike",
-  email: "mike@example.com",
-  password: "56what!!",
-  tokens: [
-    {
-      token: jwt.sign({ _id: userOneId }, process.env.JWT_SECRET),
-    },
-  ],
-};
-
-beforeEach(async () => {
-  await User.deleteMany();
-  const user = new User(userOne);
-  await user.save();
-});
+beforeEach(setupDatabase);
 
 afterEach(() => {
   console.log("afterEach");
@@ -110,4 +91,27 @@ test("Should uploads avatar image", async () => {
     .expect(200);
   const user = await User.findById(userOneId);
   expect(user.avatar).toEqual(expect.any(Buffer));
+});
+
+test("Should update valid user fields", async () => {
+  await request(app)
+    .patch("/users/me")
+    .set("Authorization", `Bearer ${userOne.tokens[0].token}`)
+    .send({
+      name: "Jess",
+    })
+    .expect(200);
+
+  const user = await User.findById(userOneId);
+  expect(user.name).toEqual("Jess");
+});
+
+test("Should  not update Invalid user fields", async () => {
+  await request(app)
+    .patch("/users/me")
+    .set("Authorization", `Bearer ${userOne.tokens[0].token}`)
+    .send({
+      location: "India",
+    })
+    .expect(400);
 });
